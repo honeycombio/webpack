@@ -6,8 +6,8 @@ import (
 	"log"
 	"strings"
 
-	"github.com/go-webpack/webpack/helper"
-	"github.com/go-webpack/webpack/reader"
+	"github.com/honeycombio/webpack/helper"
+	"github.com/honeycombio/webpack/reader"
 )
 
 // DevHost webpack-dev-server host:port

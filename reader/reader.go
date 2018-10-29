@@ -3,8 +3,8 @@ package reader
 import (
 	"errors"
 
-	"github.com/go-webpack/webpack/reader/manifest"
-	"github.com/go-webpack/webpack/reader/stats"
+	"github.com/honeycombio/webpack/reader/manifest"
+	"github.com/honeycombio/webpack/reader/stats"
 )
 
 // Read webpack asset manifest
