@@ -28,6 +28,9 @@ var IgnoreMissing = true
 // Verbose error messages to console (even if error is ignored)
 var Verbose = true
 
+// provide an optional asset host to support a CDN
+var AssetHost = ""
+
 type Config struct {
 	// DevHost webpack-dev-server host:port
 	DevHost string
@@ -43,6 +46,8 @@ type Config struct {
 	Verbose bool
 	// IsDev - true to use webpack-serve or webpack-dev-server, false to use filesystem and manifest.json
 	IsDev bool
+	// AssetHost - optionally provide an asset host to support a CDN
+	AssetHost string
 }
 
 var AssetHelper func(string) (template.HTML, error)
@@ -64,6 +69,7 @@ func Init(dev bool) error {
 		IgnoreMissing: IgnoreMissing,
 		Verbose:       Verbose,
 		IsDev:         dev,
+		AssetHost:     AssetHost,
 	})
 	return err
 }
@@ -77,6 +83,7 @@ func BasicConfig(host, path, webPath string) *Config {
 		IgnoreMissing: true,
 		Verbose:       true,
 		IsDev:         false,
+		AssetHost:     AssetHost,
 	}
 }
 
@@ -143,7 +150,11 @@ func createAssetHelper(conf *Config, preloadedAssets map[string][]string) func(s
 		buf := []string{}
 		for _, s := range v {
 			if strings.HasSuffix(s, "."+kind) {
-				buf = append(buf, helper.AssetTag(kind, s))
+				url := s
+				if len(conf.AssetHost) > 0 {
+					url = conf.AssetHost + url
+				}
+				buf = append(buf, helper.AssetTag(kind, url))
 			} else {
 				log.Println("skip asset", s, ": bad type")
 			}
