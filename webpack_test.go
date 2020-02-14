@@ -8,6 +8,7 @@ func TestManifestAssetHelper(t *testing.T) {
 	assets := map[string][]string{
 		"main.js":   []string{"main.1.js", "main.2.js"},
 		"image.png": []string{"image.3.png"},
+		"image.svg": []string{"image.4.svg"},
 	}
 
 	tagHelper := createAssetTagHelper(&Config{
@@ -41,6 +42,17 @@ func TestManifestAssetHelper(t *testing.T) {
 		t.Fatalf("unexpected <script> tags\nexpected:\n%s\nactual:\n%s", expectedHTML, html)
 	}
 
+	html, err = tagHelper("image.svg")
+	if err != nil {
+		t.Fatalf("error %v returned from asset tag helper for valid asset", err)
+	}
+	expectedHTML =
+		`<img src="image.4.svg"></img>`
+
+	if string(html) != expectedHTML {
+		t.Fatalf("unexpected <script> tags\nexpected:\n%s\nactual:\n%s", expectedHTML, html)
+	}
+
 	url, err := urlHelper("main.js")
 	if err != nil {
 		t.Fatalf("error %v returned from asset url helper for valid asset", err)
@@ -67,6 +79,7 @@ func TestManifestAssetHelperWithAssetHost(t *testing.T) {
 	assets := map[string][]string{
 		"main.js":   []string{"main.1.js"},
 		"image.png": []string{"image.3.png"},
+		"image.svg": []string{"image.4.svg"},
 	}
 
 	tagHelper := createAssetTagHelper(&Config{
@@ -96,6 +109,17 @@ func TestManifestAssetHelperWithAssetHost(t *testing.T) {
 	}
 	expectedHTML =
 		`<img src="//cdn.com/prefix/image.3.png"></img>`
+
+	if string(html) != expectedHTML {
+		t.Fatalf("unexpected <script> tags\nexpected:\n%s\nactual:\n%s", expectedHTML, html)
+	}
+
+	html, err = tagHelper("image.svg")
+	if err != nil {
+		t.Fatalf("error %v returned from asset tag helper for valid asset", err)
+	}
+	expectedHTML =
+		`<img src="//cdn.com/prefix/image.4.svg"></img>`
 
 	if string(html) != expectedHTML {
 		t.Fatalf("unexpected <script> tags\nexpected:\n%s\nactual:\n%s", expectedHTML, html)
