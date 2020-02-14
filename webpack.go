@@ -118,50 +118,63 @@ func GetAssetHelpers(conf *Config) (AssetTagHelperFunc, AssetURLHelperFunc, erro
 	return createAssetTagHelper(conf, preloadedAssets), createAssetURLHelper(conf, preloadedAssets), nil
 }
 
+func getValues(key, kind string, conf *Config, preloadedAssets map[string][]string) ([]string, error) {
+	var err error
+
+	var assets map[string][]string
+	if conf.IsDev {
+		assets, err = readManifest(conf)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		assets = preloadedAssets
+	}
+
+	v, ok := assets[key]
+	if !ok {
+		message := "go-webpack: Asset file '" + key + "' not found in manifest"
+		if conf.Verbose {
+			log.Printf("%s. Manifest contents:", message)
+			for k, a := range assets {
+				log.Printf("%s: %s", k, a)
+			}
+		}
+		if conf.IgnoreMissing {
+			return nil, nil
+		}
+		return nil, errors.New(message)
+	}
+
+	values := []string{}
+	for _, s := range v {
+		if strings.HasSuffix(s, "."+kind) {
+			url := s
+			if len(conf.AssetHost) > 0 {
+				url = conf.AssetHost + url
+			}
+			values = append(values, url)
+		} else {
+			log.Println("skip asset", s, ": bad type")
+		}
+	}
+
+	return values, nil
+}
+
 func createAssetTagHelper(conf *Config, preloadedAssets map[string][]string) AssetTagHelperFunc {
 	return func(key string) (template.HTML, error) {
-		var err error
-
-		var assets map[string][]string
-		if conf.IsDev {
-			assets, err = readManifest(conf)
-			if err != nil {
-				return template.HTML(""), err
-			}
-		} else {
-			assets = preloadedAssets
-		}
-
 		parts := strings.Split(key, ".")
 		kind := parts[len(parts)-1]
-		//log.Println("showing assets:", key, parts, kind)
 
-		v, ok := assets[key]
-		if !ok {
-			message := "go-webpack: Asset file '" + key + "' not found in manifest"
-			if conf.Verbose {
-				log.Printf("%s. Manifest contents:", message)
-				for k, a := range assets {
-					log.Printf("%s: %s", k, a)
-				}
-			}
-			if conf.IgnoreMissing {
-				return template.HTML(""), nil
-			}
-			return template.HTML(""), errors.New(message)
+		urls, err := getValues(key, kind, conf, preloadedAssets)
+		if err != nil {
+			return template.HTML(""), err
 		}
 
 		buf := []string{}
-		for _, s := range v {
-			if strings.HasSuffix(s, "."+kind) {
-				url := s
-				if len(conf.AssetHost) > 0 {
-					url = conf.AssetHost + url
-				}
-				buf = append(buf, helper.AssetTag(kind, url))
-			} else {
-				log.Println("skip asset", s, ": bad type")
-			}
+		for _, url := range urls {
+			buf = append(buf, helper.AssetTag(kind, url))
 		}
 		return template.HTML(strings.Join(buf, "\n")), nil
 	}
@@ -169,48 +182,17 @@ func createAssetTagHelper(conf *Config, preloadedAssets map[string][]string) Ass
 
 func createAssetURLHelper(conf *Config, preloadedAssets map[string][]string) AssetURLHelperFunc {
 	return func(key string) (string, error) {
-		var err error
-
-		var assets map[string][]string
-		if conf.IsDev {
-			assets, err = readManifest(conf)
-			if err != nil {
-				return "", err
-			}
-		} else {
-			assets = preloadedAssets
-		}
-
 		parts := strings.Split(key, ".")
 		kind := parts[len(parts)-1]
-		//log.Println("showing assets:", key, parts, kind)
 
-		v, ok := assets[key]
-		if !ok {
-			message := "go-webpack: Asset file '" + key + "' not found in manifest"
-			if conf.Verbose {
-				log.Printf("%s. Manifest contents:", message)
-				for k, a := range assets {
-					log.Printf("%s: %s", k, a)
-				}
-			}
-			if conf.IgnoreMissing {
-				return "", nil
-			}
-			return "", errors.New(message)
+		urls, err := getValues(key, kind, conf, preloadedAssets)
+		if err != nil {
+			return "", err
 		}
 
 		buf := []string{}
-		for _, s := range v {
-			if strings.HasSuffix(s, "."+kind) {
-				url := s
-				if len(conf.AssetHost) > 0 {
-					url = conf.AssetHost + url
-				}
-				buf = append(buf, url)
-			} else {
-				log.Println("skip asset", s, ": bad type")
-			}
+		for _, url := range urls {
+			buf = append(buf, url)
 		}
 		// this seems very wrong for multiple urls, but we don't have that problem right now :grimacing:
 		return strings.Join(buf, ","), nil
