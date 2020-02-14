@@ -50,7 +50,11 @@ type Config struct {
 	AssetHost string
 }
 
-var AssetHelper func(string) (template.HTML, error)
+type AssetTagHelperFunc func(string) (template.HTML, error)
+type AssetURLHelperFunc func(string) (string, error)
+
+var AssetTagHelper AssetTagHelperFunc
+var AssetURLHelper AssetURLHelperFunc
 
 // Init Set current environment and preload manifest
 func Init(dev bool) error {
@@ -61,7 +65,7 @@ func Init(dev bool) error {
 	}
 
 	var err error
-	AssetHelper, err = GetAssetHelper(&Config{
+	AssetTagHelper, AssetURLHelper, err = GetAssetHelpers(&Config{
 		DevHost:       DevHost,
 		FsPath:        FsPath,
 		WebPath:       WebPath,
@@ -93,7 +97,7 @@ func readManifest(conf *Config) (map[string][]string, error) {
 	return reader.Read(conf.Plugin, conf.DevHost, conf.FsPath, conf.WebPath, conf.IsDev)
 }
 
-func GetAssetHelper(conf *Config) (func(string) (template.HTML, error), error) {
+func GetAssetHelpers(conf *Config) (AssetTagHelperFunc, AssetURLHelperFunc, error) {
 	preloadedAssets := map[string][]string{}
 
 	var err error
@@ -107,14 +111,14 @@ func GetAssetHelper(conf *Config) (func(string) (template.HTML, error), error) {
 		preloadedAssets, err = readManifest(conf)
 		// we won't ever re-check assets in this case.  this should be a hard error.
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
-	return createAssetHelper(conf, preloadedAssets), nil
+	return createAssetTagHelper(conf, preloadedAssets), createAssetURLHelper(conf, preloadedAssets), nil
 }
 
-func createAssetHelper(conf *Config, preloadedAssets map[string][]string) func(string) (template.HTML, error) {
+func createAssetTagHelper(conf *Config, preloadedAssets map[string][]string) AssetTagHelperFunc {
 	return func(key string) (template.HTML, error) {
 		var err error
 
@@ -160,5 +164,55 @@ func createAssetHelper(conf *Config, preloadedAssets map[string][]string) func(s
 			}
 		}
 		return template.HTML(strings.Join(buf, "\n")), nil
+	}
+}
+
+func createAssetURLHelper(conf *Config, preloadedAssets map[string][]string) AssetURLHelperFunc {
+	return func(key string) (string, error) {
+		var err error
+
+		var assets map[string][]string
+		if conf.IsDev {
+			assets, err = readManifest(conf)
+			if err != nil {
+				return "", err
+			}
+		} else {
+			assets = preloadedAssets
+		}
+
+		parts := strings.Split(key, ".")
+		kind := parts[len(parts)-1]
+		//log.Println("showing assets:", key, parts, kind)
+
+		v, ok := assets[key]
+		if !ok {
+			message := "go-webpack: Asset file '" + key + "' not found in manifest"
+			if conf.Verbose {
+				log.Printf("%s. Manifest contents:", message)
+				for k, a := range assets {
+					log.Printf("%s: %s", k, a)
+				}
+			}
+			if conf.IgnoreMissing {
+				return "", nil
+			}
+			return "", errors.New(message)
+		}
+
+		buf := []string{}
+		for _, s := range v {
+			if strings.HasSuffix(s, "."+kind) {
+				url := s
+				if len(conf.AssetHost) > 0 {
+					url = conf.AssetHost + url
+				}
+				buf = append(buf, url)
+			} else {
+				log.Println("skip asset", s, ": bad type")
+			}
+		}
+		// this seems very wrong for multiple urls, but we don't have that problem right now :grimacing:
+		return strings.Join(buf, ","), nil
 	}
 }
